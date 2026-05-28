@@ -1,680 +1,1107 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!--
+  ═══════════════════════════════════════════════════════════════════
+    Advanced Animated Tic-Tac-Toe
+    Single-file · GitHub Pages ready · Glassmorphism dark theme
+    Features: SVG draw animations · Win-line laser · Confetti
+              Minimax AI · Dynamic audio iframes · Spring modal
+  ═══════════════════════════════════════════════════════════════════
+  -->
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tic Tac Toe</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Advanced Animated Tic-Tac-Toe</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
   <style>
+    /* ═══════════════════════════════════════════════════════════════
+       CSS CUSTOM PROPERTIES & RESET
+    ═══════════════════════════════════════════════════════════════ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0d0d0d;
-      --surface: #161616;
-      --border: #2a2a2a;
-      --x-color: #ff4d4d;
-      --o-color: #4ddfff;
-      --text: #f0f0f0;
-      --muted: #555;
-      --sidebar-w: 260px;
+      /* Player colours */
+      --xc:   #ff3d6e;          /* neon rose  */
+      --oc:   #00e5ff;          /* electric cyan */
+
+      /* Glass system */
+      --glass-bg: rgba(255,255,255,0.035);
+      --glass-bd: rgba(255,255,255,0.09);
+      --blur: 20px;
+
+      /* Layout */
+      --cell: clamp(86px, 27vmin, 145px);
+      --gap:  clamp(6px,  1.4vmin, 11px);
+      --r:    14px;
+
+      /* Text */
+      --text:  #eef0f5;
+      --muted: rgba(238,240,245,0.38);
+
+      /* Sidebar */
+      --sb-w: 278px;
     }
 
+    html, body { height: 100%; overflow: hidden; font-family: 'DM Mono', monospace; color: var(--text); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       ANIMATED BACKGROUND
+    ═══════════════════════════════════════════════════════════════ */
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'DM Mono', monospace;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 32px;
-      padding: 24px;
+      background: #050810;
       position: relative;
-      overflow-x: hidden;
     }
 
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
+    /* Slow-shifting gradient layer */
+    .bg-grad {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background: linear-gradient(125deg,
+        #0a0118 0%,
+        #060d1e 30%,
+        #010a16 60%,
+        #0d0020 100%);
+      background-size: 300% 300%;
+      animation: gradDrift 18s ease infinite;
+    }
+    @keyframes gradDrift {
+      0%   { background-position:  0%  50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position:  0%  50%; }
     }
 
-    /* ── SIDEBAR ── */
+    /* Atmospheric orbs */
+    .orb {
+      position: fixed; border-radius: 50%; pointer-events: none;
+      filter: blur(80px); opacity: 0.16; z-index: 0;
+      animation: orbFloat 22s ease-in-out infinite alternate;
+    }
+    .orb-1 { width: 55vmax; height: 55vmax; background: var(--xc); top: -20vmax; left: -15vmax; }
+    .orb-2 { width: 48vmax; height: 48vmax; background: var(--oc); bottom: -14vmax; right: -10vmax; animation-delay: -11s; }
+    .orb-3 { width: 35vmax; height: 35vmax; background: #7b2fff; top: 35%; left: 45%; animation-delay: -6s; opacity: 0.10; }
+    @keyframes orbFloat {
+      from { transform: translate(0, 0) scale(1); }
+      to   { transform: translate(5vmin, -7vmin) scale(1.06); }
+    }
+
+    /* Subtle dot-grid texture */
+    .bg-grid {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       CONFETTI CANVAS
+    ═══════════════════════════════════════════════════════════════ */
+    #confetti { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SETTINGS GEAR BUTTON
+    ═══════════════════════════════════════════════════════════════ */
+    .gear-btn {
+      position: fixed; top: 16px; right: 16px; z-index: 88;
+      width: 44px; height: 44px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-bd);
+      backdrop-filter: blur(var(--blur));
+      -webkit-backdrop-filter: blur(var(--blur));
+      border-radius: 12px; color: var(--muted); font-size: 1.1rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: color .2s, border-color .2s, box-shadow .2s;
+    }
+    .gear-btn:hover {
+      color: var(--text); border-color: rgba(255,255,255,.2);
+      box-shadow: 0 0 16px rgba(255,255,255,.07);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SIDEBAR OVERLAY
+    ═══════════════════════════════════════════════════════════════ */
+    .sb-veil {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.5);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      z-index: 90;
+    }
+    .sb-veil.on { display: block; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       SIDEBAR
+    ═══════════════════════════════════════════════════════════════ */
     .sidebar {
-      position: fixed;
-      top: 0;
-      right: 0;
-      height: 100%;
-      width: var(--sidebar-w);
-      background: #111;
-      border-left: 1px solid var(--border);
-      z-index: 100;
-      padding: 32px 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 28px;
+      position: fixed; top: 0; right: 0;
+      height: 100%; width: var(--sb-w);
+      background: rgba(6,3,18,.9);
+      border-left: 1px solid rgba(255,255,255,.07);
+      backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
+      z-index: 95; padding: 28px 20px;
+      display: flex; flex-direction: column; gap: 26px;
       transform: translateX(100%);
-      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      transition: transform .38s cubic-bezier(.4,0,.2,1);
     }
+    .sidebar.on { transform: translateX(0); }
 
-    .sidebar.open { transform: translateX(0); }
-
-    .sidebar-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.55);
-      z-index: 99;
+    .sb-head {
+      font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800;
+      letter-spacing: .04em; padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255,255,255,.07);
     }
-    .sidebar-overlay.visible { display: block; }
+    .sb-lbl { font-size: .56rem; letter-spacing: .24em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
 
-    .sidebar-title {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.6rem;
-      letter-spacing: 0.12em;
-      color: var(--text);
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 12px;
+    .diff-list { display: flex; flex-direction: column; gap: 8px; }
+    .diff-opt {
+      width: 100%; padding: 12px 14px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+      border-radius: 9px; color: var(--muted);
+      font-family: 'DM Mono', monospace; font-size: .72rem; letter-spacing: .05em;
+      text-align: left; cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+      transition: all .2s;
     }
+    .diff-opt:hover { color: var(--text); background: rgba(255,255,255,.06); }
+    .diff-opt.on.easy   { border-color: #4dff91; color: #4dff91; background: rgba(77,255,145,.07); }
+    .diff-opt.on.medium { border-color: #ffe24d; color: #ffe24d; background: rgba(255,226,77,.07); }
+    .diff-opt.on.hard   { border-color: var(--xc); color: var(--xc); background: rgba(255,61,110,.07); }
+    .d-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .easy   .d-dot { background: #4dff91; box-shadow: 0 0 6px #4dff91; }
+    .medium .d-dot { background: #ffe24d; box-shadow: 0 0 6px #ffe24d; }
+    .hard   .d-dot { background: var(--xc);  box-shadow: 0 0 6px var(--xc);  }
+    .d-info { display: flex; flex-direction: column; }
+    .d-sub  { font-size: .57rem; color: var(--muted); margin-top: 2px; }
 
-    .sidebar-section-label {
-      font-size: 0.6rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-
-    .diff-options {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .diff-btn {
-      width: 100%;
-      padding: 12px 16px;
-      text-align: left;
-      font-size: 0.72rem;
-      letter-spacing: 0.14em;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .diff-btn:hover { color: var(--text); border-color: #444; }
-
-    .diff-btn.active.easy   { border-color: #4dff91; color: #4dff91; background: rgba(77,255,145,0.06); }
-    .diff-btn.active.medium { border-color: #ffd24d; color: #ffd24d; background: rgba(255,210,77,0.06); }
-    .diff-btn.active.hard   { border-color: var(--x-color); color: var(--x-color); background: rgba(255,77,77,0.06); }
-
-    .diff-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .easy   .diff-dot { background: #4dff91; }
-    .medium .diff-dot { background: #ffd24d; }
-    .hard   .diff-dot { background: var(--x-color); }
-
-    .diff-desc {
-      font-size: 0.6rem;
-      color: var(--muted);
-      margin-top: 2px;
-      letter-spacing: 0.08em;
-    }
-
-    .diff-text { display: flex; flex-direction: column; }
-
-    /* Sound toggle */
-    .sound-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .toggle-wrap { display: flex; align-items: center; gap: 10px; }
-
+    .snd-row { display: flex; align-items: center; justify-content: space-between; font-size: .72rem; color: var(--muted); }
     .toggle {
-      width: 40px; height: 22px;
-      background: var(--border);
-      border-radius: 11px;
-      position: relative;
-      cursor: pointer;
-      transition: background 0.25s;
-      border: none;
-      flex-shrink: 0;
+      width: 44px; height: 24px; border: none; border-radius: 12px;
+      background: rgba(255,255,255,.12); position: relative; cursor: pointer;
+      transition: background .25s;
     }
-    .toggle.on { background: var(--o-color); }
+    .toggle.on { background: var(--oc); box-shadow: 0 0 10px var(--oc); }
     .toggle::after {
-      content: '';
-      position: absolute;
-      top: 3px; left: 3px;
-      width: 16px; height: 16px;
-      border-radius: 50%;
-      background: #fff;
-      transition: transform 0.25s;
+      content: ''; position: absolute;
+      top: 3px; left: 3px; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff;
+      transition: transform .28s cubic-bezier(.34,1.56,.64,1);
     }
-    .toggle.on::after { transform: translateX(18px); }
+    .toggle.on::after { transform: translateX(20px); }
 
-    .sidebar-close {
-      margin-top: auto;
-      width: 100%;
-      padding: 11px;
-      font-size: 0.65rem;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.2s;
+    .sb-close {
+      margin-top: auto; padding: 10px; width: 100%; border-radius: 8px;
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.07);
+      color: var(--muted); font-family: 'DM Mono', monospace; font-size: .62rem;
+      letter-spacing: .14em; text-transform: uppercase; cursor: pointer;
+      transition: color .2s;
     }
-    .sidebar-close:hover { color: var(--text); border-color: #555; }
+    .sb-close:hover { color: var(--text); }
 
-    /* Settings gear button */
-    .settings-btn {
-      position: fixed;
-      top: 18px;
-      right: 18px;
-      z-index: 98;
-      width: 40px; height: 40px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      transition: all 0.2s;
-      padding: 0;
-    }
-    .settings-btn:hover { color: var(--text); border-color: #555; }
-
-    /* ── MAIN ── */
-    .container {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 28px;
+    /* ═══════════════════════════════════════════════════════════════
+       APP WRAPPER
+    ═══════════════════════════════════════════════════════════════ */
+    .app {
+      position: relative; z-index: 1;
+      height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: clamp(12px, 2.2vh, 24px);
+      padding: 20px;
     }
 
-    h1 {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(3rem, 10vw, 5.5rem);
-      letter-spacing: 0.12em;
-      background: linear-gradient(135deg, var(--x-color), var(--o-color));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    /* ═══════════════════════════════════════════════════════════════
+       TITLE
+    ═══════════════════════════════════════════════════════════════ */
+    .title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.5rem, 5.5vmin, 2.7rem);
+      font-weight: 800; letter-spacing: .05em; text-align: center;
+      background: linear-gradient(130deg, var(--xc) 20%, var(--oc) 80%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
       background-clip: text;
-      line-height: 1;
+      filter: drop-shadow(0 0 22px rgba(255,61,110,.3));
     }
 
-    .scores {
+    /* ═══════════════════════════════════════════════════════════════
+       MODE TABS
+    ═══════════════════════════════════════════════════════════════ */
+    .mode-tabs {
       display: flex;
-      gap: 16px;
-      align-items: center;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px; overflow: hidden;
+      backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
     }
-
-    .score-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 10px 24px;
-      text-align: center;
-      min-width: 80px;
+    .mode-tab {
+      padding: 9px 24px; background: transparent; border: none;
+      font-family: 'DM Mono', monospace; font-size: .66rem; font-weight: 500;
+      letter-spacing: .12em; text-transform: uppercase; color: var(--muted);
+      cursor: pointer; transition: all .22s;
     }
-    .score-card.x-card { border-top: 2px solid var(--x-color); }
-    .score-card.o-card { border-top: 2px solid var(--o-color); }
+    .mode-tab.on { background: rgba(255,255,255,.09); color: var(--text); }
 
-    .score-label {
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: var(--muted);
-      text-transform: uppercase;
+    /* ═══════════════════════════════════════════════════════════════
+       SCOREBOARD
+    ═══════════════════════════════════════════════════════════════ */
+    .scoreboard { display: flex; gap: 10px; align-items: stretch; }
+    .sc-card {
+      background: var(--glass-bg); border: 1px solid var(--glass-bd);
+      backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+      border-radius: 12px; padding: 10px 18px; text-align: center; min-width: 68px;
     }
+    .sc-card.xc { border-top: 2px solid var(--xc); }
+    .sc-card.dc { border-top: 2px solid rgba(255,255,255,.18); }
+    .sc-card.oc { border-top: 2px solid var(--oc); }
+    .sc-lbl { font-size: .52rem; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+    .sc-num { font-family: 'Syne', sans-serif; font-size: 1.85rem; font-weight: 800; line-height: 1.1; }
+    .xc .sc-num { color: var(--xc); text-shadow: 0 0 14px var(--xc); }
+    .oc .sc-num { color: var(--oc); text-shadow: 0 0 14px var(--oc); }
+    .dc .sc-num { color: rgba(255,255,255,.5); }
 
-    .score-val {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 2rem;
-      line-height: 1.1;
+    /* ═══════════════════════════════════════════════════════════════
+       STATUS LINE
+    ═══════════════════════════════════════════════════════════════ */
+    .status-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    #status {
+      font-size: .76rem; letter-spacing: .22em; text-transform: uppercase;
+      min-height: 20px; transition: color .3s, text-shadow .3s;
     }
-    .x-card .score-val { color: var(--x-color); }
-    .o-card .score-val { color: var(--o-color); }
+    #status.xt { color: var(--xc); text-shadow: 0 0 12px var(--xc); }
+    #status.ot { color: var(--oc); text-shadow: 0 0 12px var(--oc); }
+    #status.draw { color: rgba(255,255,255,.55); }
+    .diff-tag { font-size: .52rem; letter-spacing: .16em; text-transform: uppercase; color: rgba(255,255,255,.2); }
 
-    .score-sep {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 1.5rem;
-      color: var(--muted);
-    }
+    /* ═══════════════════════════════════════════════════════════════
+       BOARD WRAPPER + BOARD
+    ═══════════════════════════════════════════════════════════════ */
+    .board-wrap { position: relative; }
 
-    .status {
-      font-size: 0.8rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--muted);
-      height: 20px;
-      transition: color 0.3s;
-    }
-    .status.x-turn   { color: var(--x-color); }
-    .status.o-turn   { color: var(--o-color); }
-    .status.winner   { color: var(--text); font-size: 0.9rem; }
-    .status.draw     { color: #aaa; }
-
-    /* Difficulty badge under status */
-    .diff-badge {
-      font-size: 0.6rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--muted);
-      height: 16px;
-    }
-
-    .board {
+    #board {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-      background: var(--border);
-      padding: 6px;
-      border: 1px solid var(--border);
+      grid-template-columns: repeat(3, var(--cell));
+      grid-template-rows:    repeat(3, var(--cell));
+      gap: var(--gap);
+      position: relative; z-index: 1;
     }
 
+    /* ─── CELLS ─── */
     .cell {
-      width: clamp(90px, 22vw, 130px);
-      height: clamp(90px, 22vw, 130px);
-      background: var(--surface);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      width: var(--cell); height: var(--cell);
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-bd);
+      backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+      border-radius: var(--r);
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+      transition: border-color .3s, box-shadow .3s, background .25s, transform .15s;
+    }
+
+    /* Hover glow — colour switches via JS class on #board */
+    #board.xt-hover .cell.free:hover {
+      border-color: var(--xc);
+      box-shadow: 0 0 22px rgba(255,61,110,.28), inset 0 0 20px rgba(255,61,110,.07);
+      background: rgba(255,61,110,.05);
+      transform: scale(1.035);
       cursor: pointer;
-      transition: background 0.15s;
     }
-    .cell:hover:not(.taken) { background: #1f1f1f; }
-    .cell.taken { cursor: default; }
-
-    .cell svg {
-      width: 52%;
-      height: 52%;
-      opacity: 0;
-      transform: scale(0.4) rotate(-15deg);
-      transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
-    }
-    .cell.played svg { opacity: 1; transform: scale(1) rotate(0deg); }
-
-    .cell.win-cell { background: #1a1a1a; }
-    .cell.win-cell.x-win { box-shadow: inset 0 0 30px rgba(255,77,77,0.15); }
-    .cell.win-cell.o-win { box-shadow: inset 0 0 30px rgba(77,223,255,0.15); }
-
-    .x-mark line { stroke: var(--x-color); stroke-width: 6; stroke-linecap: round; }
-    .o-mark circle { stroke: var(--o-color); stroke-width: 6; fill: none; }
-
-    .btn-row { display: flex; gap: 12px; }
-
-    button {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.7rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      padding: 10px 24px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
+    #board.ot-hover .cell.free:hover {
+      border-color: var(--oc);
+      box-shadow: 0 0 22px rgba(0,229,255,.28), inset 0 0 20px rgba(0,229,255,.07);
+      background: rgba(0,229,255,.05);
+      transform: scale(1.035);
       cursor: pointer;
-      transition: all 0.2s;
     }
-    button:hover { border-color: var(--text); color: var(--text); }
-    button.primary { border-color: var(--x-color); color: var(--x-color); }
-    button.primary:hover { background: var(--x-color); color: #000; }
 
-    .mode-row { display: flex; border: 1px solid var(--border); }
-    .mode-btn { padding: 8px 18px; font-size: 0.65rem; border: none; border-radius: 0; }
-    .mode-btn.active { background: var(--surface); color: var(--text); }
-    .mode-btn:not(.active):hover { background: #111; }
+    /* Win highlight */
+    .cell.wx {
+      border-color: var(--xc)   !important;
+      box-shadow: 0 0 28px rgba(255,61,110,.4), inset 0 0 22px rgba(255,61,110,.1) !important;
+      background: rgba(255,61,110,.08) !important;
+    }
+    .cell.wo {
+      border-color: var(--oc) !important;
+      box-shadow: 0 0 28px rgba(0,229,255,.4), inset 0 0 22px rgba(0,229,255,.1) !important;
+      background: rgba(0,229,255,.08) !important;
+    }
+
+    /* ─── SVG SYMBOLS ─── */
+    .cell svg { width: 56%; height: 56%; }
+
+    /* X — two lines animated via stroke-dashoffset */
+    .xl1, .xl2 {
+      stroke: var(--xc); stroke-width: 7; stroke-linecap: round; fill: none;
+      stroke-dasharray: 85; stroke-dashoffset: 85;
+      filter: drop-shadow(0 0 5px var(--xc));
+    }
+    .xl1 { animation: drawLine .3s cubic-bezier(.16,1,.3,1) forwards; }
+    .xl2 { animation: drawLine .3s cubic-bezier(.16,1,.3,1) .15s forwards; }
+
+    /* O — circle animated via stroke-dashoffset */
+    .oc-path {
+      stroke: var(--oc); stroke-width: 7; stroke-linecap: round; fill: none;
+      stroke-dasharray: 190; stroke-dashoffset: 190;
+      filter: drop-shadow(0 0 5px var(--oc));
+      animation: drawLine .48s cubic-bezier(.16,1,.3,1) forwards;
+    }
+
+    @keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+    /* ═══════════════════════════════════════════════════════════════
+       WIN-LINE SVG OVERLAY
+    ═══════════════════════════════════════════════════════════════ */
+    #win-svg {
+      position: absolute; top: 0; left: 0;
+      pointer-events: none; z-index: 5; overflow: visible;
+    }
+    .win-beam {
+      fill: none; stroke-linecap: round; stroke-width: 5;
+    }
+    .win-beam.x { stroke: var(--xc); filter: drop-shadow(0 0 8px var(--xc)); }
+    .win-beam.o { stroke: var(--oc); filter: drop-shadow(0 0 8px var(--oc)); }
+
+    @keyframes laserStrike {
+      from { stroke-dashoffset: var(--ll); }
+      to   { stroke-dashoffset: 0; }
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
+       ACTION BUTTONS
+    ═══════════════════════════════════════════════════════════════ */
+    .btn-row { display: flex; gap: 10px; }
+    .btn {
+      padding: 10px 26px;
+      background: var(--glass-bg); border: 1px solid var(--glass-bd);
+      backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
+      border-radius: 10px;
+      font-family: 'DM Mono', monospace; font-size: .66rem;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+      cursor: pointer; transition: all .22s;
+    }
+    .btn:hover { color: var(--text); border-color: rgba(255,255,255,.22); }
+    .btn.primary { border-color: rgba(255,61,110,.45); color: var(--xc); }
+    .btn.primary:hover { background: rgba(255,61,110,.1); border-color: var(--xc); box-shadow: 0 0 18px rgba(255,61,110,.18); }
+
+    /* ═══════════════════════════════════════════════════════════════
+       END-GAME MODAL
+    ═══════════════════════════════════════════════════════════════ */
+    .modal-veil {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      align-items: center; justify-content: center;
+    }
+    .modal-veil.on { display: flex; animation: fadeIn .22s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal {
+      background: rgba(8,4,22,.9); border: 1px solid rgba(255,255,255,.1);
+      backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px);
+      border-radius: 22px; padding: 38px 32px;
+      text-align: center; max-width: 370px; width: 92%;
+      display: flex; flex-direction: column; align-items: center; gap: 18px;
+      animation: springUp .55s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes springUp {
+      from { opacity: 0; transform: scale(.55) translateY(28px); }
+      to   { opacity: 1; transform: scale(1)  translateY(0); }
+    }
+
+    .m-emoji {
+      font-size: 3.4rem; line-height: 1;
+      animation: popIn .62s cubic-bezier(.34,1.56,.64,1) .15s both;
+    }
+    @keyframes popIn {
+      from { transform: scale(0) rotate(-20deg); }
+      to   { transform: scale(1) rotate(0); }
+    }
+
+    .m-title {
+      font-family: 'Syne', sans-serif; font-size: 1.45rem;
+      font-weight: 800; letter-spacing: .05em;
+    }
+    .m-title.xw { color: var(--xc); text-shadow: 0 0 18px var(--xc); }
+    .m-title.ow { color: var(--oc); text-shadow: 0 0 18px var(--oc); }
+    .m-title.dd { color: rgba(255,255,255,.65); }
+
+    .m-sub { font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+    /* Audio iframe container */
+    .m-audio {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 64px;
+    }
+    /* Resize the iframe to something more compact */
+    .m-audio iframe { border-radius: 8px; }
+
+    .m-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+    /* ═══════════════════════════════════════════════════════════════
+       RESPONSIVE TWEAKS
+    ═══════════════════════════════════════════════════════════════ */
+    @media (max-height: 700px) {
+      .app { gap: 10px; }
+      .sc-num { font-size: 1.5rem; }
+    }
+    @media (max-width: 400px) {
+      :root { --cell: clamp(78px, 28vw, 106px); --gap: 5px; }
+    }
   </style>
 </head>
 <body>
 
-<!-- Settings button -->
-<button class="settings-btn" onclick="toggleSidebar()" title="Settings">⚙</button>
+  <!-- ── Background layers ─────────────────────────────────────── -->
+  <div class="bg-grad"></div>
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+  <div class="bg-grid"></div>
 
-<!-- Sidebar overlay -->
-<div class="sidebar-overlay" id="overlay" onclick="closeSidebar()"></div>
+  <!-- ── Confetti canvas ───────────────────────────────────────── -->
+  <canvas id="confetti"></canvas>
 
-<!-- Sidebar -->
-<div class="sidebar" id="sidebar">
-  <div class="sidebar-title">Settings</div>
+  <!-- ── Gear button ───────────────────────────────────────────── -->
+  <button class="gear-btn" onclick="toggleSidebar()" title="Settings">⚙</button>
 
-  <div>
-    <div class="sidebar-section-label">CPU Difficulty</div>
-    <div class="diff-options">
-      <button class="diff-btn easy active" id="diff-easy" onclick="setDifficulty('easy')">
-        <span class="diff-dot"></span>
-        <span class="diff-text">
-          <span>Easy</span>
-          <span class="diff-desc">Random moves</span>
-        </span>
-      </button>
-      <button class="diff-btn medium" id="diff-medium" onclick="setDifficulty('medium')">
-        <span class="diff-dot"></span>
-        <span class="diff-text">
-          <span>Medium</span>
-          <span class="diff-desc">Blocks & attacks sometimes</span>
-        </span>
-      </button>
-      <button class="diff-btn hard" id="diff-hard" onclick="setDifficulty('hard')">
-        <span class="diff-dot"></span>
-        <span class="diff-text">
-          <span>Hard</span>
-          <span class="diff-desc">Unbeatable minimax</span>
-        </span>
-      </button>
+  <!-- ── Sidebar veil ──────────────────────────────────────────── -->
+  <div class="sb-veil" id="sb-veil" onclick="closeSidebar()"></div>
+
+  <!-- ── Sidebar ───────────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar">
+    <h2 class="sb-head">Settings</h2>
+
+    <!-- Difficulty -->
+    <div>
+      <p class="sb-lbl">CPU Difficulty</p>
+      <div class="diff-list">
+        <button class="diff-opt easy on" id="d-easy" onclick="setDiff('easy')">
+          <span class="d-dot"></span>
+          <span class="d-info"><span>Easy</span><span class="d-sub">Fully random moves</span></span>
+        </button>
+        <button class="diff-opt medium" id="d-medium" onclick="setDiff('medium')">
+          <span class="d-dot"></span>
+          <span class="d-info"><span>Medium</span><span class="d-sub">Blocks &amp; attacks ~65%</span></span>
+        </button>
+        <button class="diff-opt hard" id="d-hard" onclick="setDiff('hard')">
+          <span class="d-dot"></span>
+          <span class="d-info"><span>Hard</span><span class="d-sub">Unbeatable minimax</span></span>
+        </button>
+      </div>
     </div>
-  </div>
 
-  <div>
-    <div class="sidebar-section-label">Sound Effects</div>
-    <div class="sound-row">
-      <span style="font-size:0.72rem;color:var(--muted)">Sound</span>
-      <div class="toggle-wrap">
-        <button class="toggle on" id="sound-toggle" onclick="toggleSound()"></button>
+    <!-- Sound -->
+    <div>
+      <p class="sb-lbl">Sound Effects</p>
+      <div class="snd-row">
+        <span>Sound</span>
+        <button class="toggle on" id="snd-toggle" onclick="toggleSound()"></button>
+      </div>
+    </div>
+
+    <button class="sb-close" onclick="closeSidebar()">✕  Close</button>
+  </aside>
+
+  <!-- ── Main app ───────────────────────────────────────────────── -->
+  <div class="app">
+
+    <h1 class="title">Tic-Tac-Toe</h1>
+
+    <!-- Mode tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab on" id="tab-pvp" onclick="setMode('pvp')">2 Players</button>
+      <button class="mode-tab"    id="tab-ai"  onclick="setMode('ai')">vs CPU</button>
+    </div>
+
+    <!-- Scores -->
+    <div class="scoreboard">
+      <div class="sc-card xc">
+        <div class="sc-lbl">Player X</div>
+        <div class="sc-num" id="sc-x">0</div>
+      </div>
+      <div class="sc-card dc">
+        <div class="sc-lbl">Draws</div>
+        <div class="sc-num" id="sc-d">0</div>
+      </div>
+      <div class="sc-card oc">
+        <div class="sc-lbl" id="o-lbl">Player O</div>
+        <div class="sc-num" id="sc-o">0</div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status-wrap">
+      <div id="status" class="xt">X's Turn</div>
+      <div class="diff-tag" id="diff-tag"></div>
+    </div>
+
+    <!-- Board -->
+    <div class="board-wrap" id="board-wrap">
+      <div id="board" class="xt-hover"></div>
+      <svg id="win-svg"></svg>
+    </div>
+
+    <!-- Buttons -->
+    <div class="btn-row">
+      <button class="btn primary" onclick="resetGame()">New Round</button>
+      <button class="btn"         onclick="resetAll()">Reset All</button>
+    </div>
+
+  </div><!-- /.app -->
+
+  <!-- ── End-game modal ────────────────────────────────────────── -->
+  <div class="modal-veil" id="modal-veil">
+    <div class="modal" id="modal">
+      <div class="m-emoji" id="m-emoji"></div>
+      <h2  class="m-title" id="m-title"></h2>
+      <p   class="m-sub"   id="m-sub"></p>
+      <div class="m-audio"  id="m-audio"></div>
+      <div class="m-btns">
+        <button class="btn primary" id="m-play-again">Play Again</button>
+        <button class="btn"         id="m-reset-all">Reset All</button>
       </div>
     </div>
   </div>
 
-  <button class="sidebar-close" onclick="closeSidebar()">✕ Close</button>
-</div>
-
-<!-- Main game -->
-<div class="container">
-  <h1>Tic Tac Toe</h1>
-
-  <div class="mode-row">
-    <button class="mode-btn active" id="pvp-btn" onclick="setMode('pvp')">2 Players</button>
-    <button class="mode-btn" id="ai-btn" onclick="setMode('ai')">vs CPU</button>
-  </div>
-
-  <div class="scores">
-    <div class="score-card x-card">
-      <div class="score-label">Player X</div>
-      <div class="score-val" id="score-x">0</div>
-    </div>
-    <div class="score-sep">/</div>
-    <div class="score-card o-card">
-      <div class="score-label" id="o-label">Player O</div>
-      <div class="score-val" id="score-o">0</div>
-    </div>
-  </div>
-
-  <div class="status x-turn" id="status">X's turn</div>
-  <div class="diff-badge" id="diff-badge">difficulty: easy</div>
-
-  <div class="board" id="board"></div>
-
-  <div class="btn-row">
-    <button class="primary" onclick="resetGame()">New Game</button>
-    <button onclick="resetScores()">Reset Scores</button>
-  </div>
-</div>
-
-<!-- Audio elements -->
-<audio id="audio-win"  src="Player win.mp3"           preload="auto"></audio>
-<audio id="audio-lose" src="directedbyrobertb.mp3"    preload="auto"></audio>
-
-<script>
+  <script>
+  /* ════════════════════════════════════════════════════════════════
+     CONSTANTS
+  ════════════════════════════════════════════════════════════════ */
   const WIN_LINES = [
-    [0,1,2],[3,4,5],[6,7,8],
-    [0,3,6],[1,4,7],[2,5,8],
-    [0,4,8],[2,4,6]
+    [0,1,2],[3,4,5],[6,7,8],  // rows
+    [0,3,6],[1,4,7],[2,5,8],  // cols
+    [0,4,8],[2,4,6]           // diagonals
   ];
 
-  let board        = Array(9).fill(null);
-  let currentPlayer = 'X';
-  let gameOver     = false;
-  let scores       = { X: 0, O: 0 };
-  let mode         = 'pvp';
-  let difficulty   = 'easy';
-  let soundOn      = true;
+  /**
+   * Audio iframe HTML for each end-game scenario.
+   * iframes are injected into the modal so they auto-play the instant sound.
+   */
+  const AUDIO_IFRAMES = {
+    playerWin : `<iframe width="110" height="60" src="https://www.myinstants.com/instant/yw-kd-dl-ny-90031/embed/"    frameborder="0" scrolling="no"></iframe>`,
+    aiWin     : `<iframe width="110" height="60" src="https://www.myinstants.com/instant/spongebob-fail-11236/embed/" frameborder="0" scrolling="no"></iframe>`,
+    pvpWin    : `<iframe width="110" height="60" src="https://www.myinstants.com/instant/children-yay-44890/embed/"   frameborder="0" scrolling="no"></iframe>`,
+  };
 
-  // ── Audio ──────────────────────────────────────────────
-  const audioWin  = document.getElementById('audio-win');
-  const audioLose = document.getElementById('audio-lose');
+  /* ════════════════════════════════════════════════════════════════
+     GAME STATE
+  ════════════════════════════════════════════════════════════════ */
+  let cells     = Array(9).fill(null);   // null | 'X' | 'O'
+  let turn      = 'X';                   // current player
+  let over      = false;                 // game-over flag
+  let mode      = 'pvp';                 // 'pvp' | 'ai'
+  let diff      = 'easy';               // 'easy' | 'medium' | 'hard'
+  let soundOn   = true;
+  let scores    = { X: 0, D: 0, O: 0 };
 
-  function playWin()  { if (!soundOn) return; audioWin.currentTime  = 0; audioWin.play().catch(()=>{}); }
-  function playLose() { if (!soundOn) return; audioLose.currentTime = 0; audioLose.play().catch(()=>{}); }
-
-  // ── Sidebar ────────────────────────────────────────────
+  /* ════════════════════════════════════════════════════════════════
+     SIDEBAR
+  ════════════════════════════════════════════════════════════════ */
   function toggleSidebar() {
-    const s = document.getElementById('sidebar');
-    s.classList.contains('open') ? closeSidebar() : openSidebar();
+    const sb = document.getElementById('sidebar');
+    sb.classList.contains('on') ? closeSidebar() : openSidebar();
   }
   function openSidebar() {
-    document.getElementById('sidebar').classList.add('open');
-    document.getElementById('overlay').classList.add('visible');
+    document.getElementById('sidebar').classList.add('on');
+    document.getElementById('sb-veil').classList.add('on');
   }
   function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('overlay').classList.remove('visible');
+    document.getElementById('sidebar').classList.remove('on');
+    document.getElementById('sb-veil').classList.remove('on');
   }
 
+  /* ════════════════════════════════════════════════════════════════
+     DIFFICULTY
+  ════════════════════════════════════════════════════════════════ */
+  function setDiff(d) {
+    diff = d;
+    ['easy','medium','hard'].forEach(x => {
+      document.getElementById('d-' + x).classList.toggle('on', x === d);
+    });
+    refreshDiffTag();
+    resetGame();
+    closeSidebar();
+  }
+  function refreshDiffTag() {
+    document.getElementById('diff-tag').textContent =
+      mode === 'ai' ? 'cpu · ' + diff : '';
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     SOUND TOGGLE
+  ════════════════════════════════════════════════════════════════ */
   function toggleSound() {
     soundOn = !soundOn;
-    document.getElementById('sound-toggle').classList.toggle('on', soundOn);
+    document.getElementById('snd-toggle').classList.toggle('on', soundOn);
   }
 
-  // ── Difficulty ─────────────────────────────────────────
-  function setDifficulty(d) {
-    difficulty = d;
-    ['easy','medium','hard'].forEach(x => {
-      const btn = document.getElementById('diff-' + x);
-      btn.classList.toggle('active', x === d);
-    });
-    document.getElementById('diff-badge').textContent =
-      mode === 'ai' ? 'difficulty: ' + d : '';
-    resetGame();
-  }
-
-  // ── Mode ───────────────────────────────────────────────
+  /* ════════════════════════════════════════════════════════════════
+     MODE SELECTION
+  ════════════════════════════════════════════════════════════════ */
   function setMode(m) {
     mode = m;
-    document.getElementById('pvp-btn').classList.toggle('active', m === 'pvp');
-    document.getElementById('ai-btn').classList.toggle('active',  m === 'ai');
-    document.getElementById('o-label').textContent = m === 'ai' ? 'CPU' : 'Player O';
-    document.getElementById('diff-badge').textContent = m === 'ai' ? 'difficulty: ' + difficulty : '';
+    document.getElementById('tab-pvp').classList.toggle('on', m === 'pvp');
+    document.getElementById('tab-ai').classList.toggle('on',  m === 'ai');
+    document.getElementById('o-lbl').textContent = m === 'ai' ? 'CPU' : 'Player O';
+    refreshDiffTag();
     resetGame();
   }
 
-  // ── Board rendering ────────────────────────────────────
-  function buildBoard() {
-    const el = document.getElementById('board');
-    el.innerHTML = '';
-    board.forEach((val, i) => {
+  /* ════════════════════════════════════════════════════════════════
+     BOARD RENDER
+     Rebuilds the 9 cell divs from state.
+  ════════════════════════════════════════════════════════════════ */
+  function renderBoard() {
+    const board = document.getElementById('board');
+    board.innerHTML = '';
+    board.className = over ? '' : (turn === 'X' ? 'xt-hover' : 'ot-hover');
+
+    cells.forEach((val, i) => {
       const cell = document.createElement('div');
-      cell.className = 'cell' + (val ? ' taken played' : '');
-      cell.dataset.index = i;
-      cell.onclick = () => handleClick(i);
-      if (val === 'X') cell.innerHTML = xSVG();
-      else if (val === 'O') cell.innerHTML = oSVG();
-      el.appendChild(cell);
+      cell.className = 'cell' + (val ? '' : ' free');
+      cell.dataset.i = i;
+
+      if (val === 'X') {
+        /* X: two diagonal lines drawn with stroke-dashoffset animation */
+        cell.innerHTML = `
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <line class="xl1" x1="20" y1="20" x2="80" y2="80"/>
+            <line class="xl2" x1="80" y1="20" x2="20" y2="80"/>
+          </svg>`;
+      } else if (val === 'O') {
+        /* O: circle with stroke-dashoffset animation */
+        cell.innerHTML = `
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <circle class="oc-path" cx="50" cy="50" r="30"/>
+          </svg>`;
+      }
+
+      cell.addEventListener('click', () => handleClick(i));
+      board.appendChild(cell);
     });
   }
 
-  function xSVG() {
-    return `<svg class="x-mark" viewBox="0 0 100 100"><line x1="20" y1="20" x2="80" y2="80"/><line x1="80" y1="20" x2="20" y2="80"/></svg>`;
-  }
-  function oSVG() {
-    return `<svg class="o-mark" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30"/></svg>`;
-  }
-
-  // ── Game logic ─────────────────────────────────────────
+  /* ════════════════════════════════════════════════════════════════
+     CLICK HANDLER
+  ════════════════════════════════════════════════════════════════ */
   function handleClick(i) {
-    if (gameOver || board[i]) return;
-    if (mode === 'ai' && currentPlayer === 'O') return;
-    makeMove(i);
-    if (mode === 'ai' && !gameOver && currentPlayer === 'O') {
-      const delay = difficulty === 'hard' ? 500 : 400;
-      setTimeout(aiMove, delay);
+    if (over || cells[i]) return;
+    /* In AI mode block player from clicking during CPU turn */
+    if (mode === 'ai' && turn === 'O') return;
+
+    placeMove(i);
+
+    /* Schedule CPU move after player places */
+    if (mode === 'ai' && !over && turn === 'O') {
+      const delay = diff === 'hard' ? 560 : 420;
+      setTimeout(cpuMove, delay);
     }
   }
 
-  function makeMove(i) {
-    board[i] = currentPlayer;
-    buildBoard();
-    const win = checkWin();
-    if (win) {
-      highlightWin(win);
-      scores[currentPlayer]++;
-      updateScores();
-      setStatus(`${currentPlayer} wins! 🎉`, 'winner');
-      gameOver = true;
+  /* ════════════════════════════════════════════════════════════════
+     PLACE MOVE — write to state, re-render, check outcome
+  ════════════════════════════════════════════════════════════════ */
+  function placeMove(i) {
+    cells[i] = turn;
+    renderBoard();
 
-      // Sound: in AI mode X = player, O = CPU
-      if (mode === 'ai') {
-        currentPlayer === 'X' ? playWin() : playLose();
-      } else {
-        playWin(); // both players get win sound in PvP
-      }
+    const wLine = getWinLine(cells);
 
-    } else if (board.every(Boolean)) {
-      setStatus("It's a draw!", 'draw');
-      gameOver = true;
+    if (wLine) {
+      /* ── WIN ── */
+      endGame(turn, wLine);
+    } else if (cells.every(Boolean)) {
+      /* ── DRAW ── */
+      endGame('draw', null);
     } else {
-      currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-      const label = mode === 'ai' && currentPlayer === 'O' ? 'CPU' : currentPlayer;
-      setStatus(`${label}'s turn`, currentPlayer === 'X' ? 'x-turn' : 'o-turn');
+      /* ── CONTINUE ── */
+      turn = turn === 'X' ? 'O' : 'X';
+      setStatus();
     }
   }
 
-  // ── AI ─────────────────────────────────────────────────
-  function aiMove() {
-    let idx;
-    if      (difficulty === 'easy')   idx = easyMove();
-    else if (difficulty === 'medium') idx = mediumMove();
-    else                              idx = minimaxMove();
-    if (idx !== -1) makeMove(idx);
+  /* ════════════════════════════════════════════════════════════════
+     STATUS DISPLAY
+  ════════════════════════════════════════════════════════════════ */
+  function setStatus(msg, cls) {
+    const el = document.getElementById('status');
+    if (msg) {
+      el.textContent = msg;
+      el.className   = cls || '';
+    } else {
+      const label = mode === 'ai' && turn === 'O' ? 'CPU' : turn;
+      el.textContent = `${label}'s Turn`;
+      el.className   = turn === 'X' ? 'xt' : 'ot';
+    }
   }
 
-  function easyMove() {
-    const open = board.map((v,i) => v ? -1 : i).filter(i => i !== -1);
+  /* ════════════════════════════════════════════════════════════════
+     WIN-LINE CHECK  — returns the winning [a,b,c] triplet or null
+  ════════════════════════════════════════════════════════════════ */
+  function getWinLine(b) {
+    return WIN_LINES.find(([a,bb,c]) =>
+      b[a] && b[a] === b[bb] && b[a] === b[c]
+    ) ?? null;
+  }
+
+  function getWinner(b) {
+    const line = getWinLine(b);
+    return line ? b[line[0]] : null;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     END GAME — handle win / draw
+  ════════════════════════════════════════════════════════════════ */
+  function endGame(result, wLine) {
+    over = true;
+
+    if (result === 'draw') {
+      scores.D++;
+      document.getElementById('sc-d').textContent = scores.D;
+      setStatus("It's a Draw!", 'draw');
+      setTimeout(() => showModal('draw'), 700);
+      return;
+    }
+
+    /* Highlight winning cells */
+    const cellEls = document.querySelectorAll('.cell');
+    wLine.forEach(i => {
+      cellEls[i].classList.remove('free');
+      cellEls[i].classList.add(result === 'X' ? 'wx' : 'wo');
+    });
+
+    /* Draw the neon laser win-line */
+    drawWinLine(wLine, result);
+
+    /* Update score */
+    scores[result]++;
+    document.getElementById(`sc-${result.toLowerCase()}`).textContent = scores[result];
+
+    const winLabel = mode === 'ai' && result === 'O' ? 'CPU' : `Player ${result}`;
+    setStatus(`${winLabel} Wins! 🎉`, result === 'X' ? 'xt' : 'ot');
+
+    /* Confetti burst from centre of winning line */
+    const midCell = document.querySelectorAll('.cell')[wLine[1]];
+    const rect = midCell.getBoundingClientRect();
+    launchConfetti(
+      rect.left + rect.width  / 2,
+      rect.top  + rect.height / 2,
+      result === 'X' ? '#ff3d6e' : '#00e5ff'
+    );
+
+    setTimeout(() => showModal(result), 950);
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     WIN-LINE DRAWING  — animated SVG line over the board
+  ════════════════════════════════════════════════════════════════ */
+  function drawWinLine(wLine, player) {
+    const boardEl  = document.getElementById('board');
+    const svgEl    = document.getElementById('win-svg');
+    const bRect    = boardEl.getBoundingClientRect();
+    const cellEls  = document.querySelectorAll('.cell');
+
+    /** Returns {x,y} centre of cell i relative to board top-left */
+    function centre(i) {
+      const r = cellEls[i].getBoundingClientRect();
+      return { x: r.left - bRect.left + r.width / 2,
+               y: r.top  - bRect.top  + r.height / 2 };
+    }
+
+    const s = centre(wLine[0]);
+    const e = centre(wLine[2]);
+
+    /* Extend line slightly beyond cell centres for visual punch */
+    const dx  = e.x - s.x, dy = e.y - s.y;
+    const len = Math.hypot(dx, dy);
+    const ext = 26;
+    const ux  = dx / len, uy = dy / len;
+
+    const x1 = s.x - ux * ext, y1 = s.y - uy * ext;
+    const x2 = e.x + ux * ext, y2 = e.y + uy * ext;
+    const ll = Math.hypot(x2 - x1, y2 - y1);
+
+    svgEl.setAttribute('width',   bRect.width);
+    svgEl.setAttribute('height',  bRect.height);
+    svgEl.setAttribute('viewBox', `0 0 ${bRect.width} ${bRect.height}`);
+
+    svgEl.innerHTML = `
+      <line
+        class="win-beam ${player.toLowerCase()}"
+        x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+        stroke-dasharray="${ll}"
+        style="--ll:${ll}px; animation: laserStrike .44s cubic-bezier(.16,1,.3,1) forwards;"
+      />`;
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     END-GAME MODAL
+  ════════════════════════════════════════════════════════════════ */
+  function showModal(result) {
+    /* Re-animate the modal by cloning & replacing it */
+    const veil  = document.getElementById('modal-veil');
+    const old   = document.getElementById('modal');
+    const fresh = old.cloneNode(true);
+    old.parentNode.replaceChild(fresh, old);
+
+    /* Wire up button events on the fresh clone */
+    fresh.querySelector('#m-play-again').onclick = () => { closeModal(); resetGame(); };
+    fresh.querySelector('#m-reset-all').onclick  = () => { closeModal(); resetAll();  };
+
+    const emojiEl = fresh.querySelector('#m-emoji');
+    const titleEl = fresh.querySelector('#m-title');
+    const subEl   = fresh.querySelector('#m-sub');
+    const audioEl = fresh.querySelector('#m-audio');
+
+    if (result === 'draw') {
+      emojiEl.textContent = '🤝';
+      titleEl.textContent = "It's a Draw!";
+      titleEl.className   = 'm-title dd';
+      subEl.textContent   = 'No winner this round';
+      audioEl.innerHTML   = '';
+    } else {
+      const isAI     = mode === 'ai';
+      const humanWon = result === 'X';           /* In AI mode X is always the human */
+
+      emojiEl.textContent = humanWon ? '🏆' : (isAI ? '🤖' : '🎉');
+
+      titleEl.textContent = isAI
+        ? (humanWon ? 'You Win!'   : 'CPU Wins!')
+        : `Player ${result} Wins!`;
+      titleEl.className = `m-title ${result === 'X' ? 'xw' : 'ow'}`;
+
+      subEl.textContent = isAI
+        ? (humanWon ? 'You outsmarted the CPU!' : 'The CPU outsmarted you this time…')
+        : `Congratulations, Player ${result}!`;
+
+      /* Inject the correct iframe */
+      if (soundOn) {
+        if (!isAI)          audioEl.innerHTML = AUDIO_IFRAMES.pvpWin;
+        else if (humanWon)  audioEl.innerHTML = AUDIO_IFRAMES.playerWin;
+        else                audioEl.innerHTML = AUDIO_IFRAMES.aiWin;
+      } else {
+        audioEl.innerHTML = '';
+      }
+    }
+
+    veil.classList.add('on');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-veil').classList.remove('on');
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     CONFETTI  — canvas particle system
+  ════════════════════════════════════════════════════════════════ */
+  const canvas = document.getElementById('confetti');
+  const ctx    = canvas.getContext('2d');
+  let   ptcls  = [];
+  let   rafID  = null;
+
+  function resizeCanvas() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  class Particle {
+    constructor(x, y, mainColor) {
+      this.x  = x;  this.y = y;
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 13 + 5;
+      this.vx  = Math.cos(angle) * speed;
+      this.vy  = Math.sin(angle) * speed - Math.random() * 5;
+      this.g   = 0.27;          /* gravity */
+      this.dr  = 0.985;         /* drag */
+      this.a   = 1;             /* alpha */
+      this.dec = .012 + Math.random() * .009;  /* decay */
+      this.sz  = Math.random() * 9 + 4;
+      this.rot = Math.random() * Math.PI * 2;
+      this.sp  = (Math.random() - .5) * .18;  /* spin */
+      this.asp = .38 + Math.random() * .55;   /* aspect ratio */
+      const palette = [mainColor, '#ffffff', '#ffd700', mainColor + 'aa'];
+      this.color = palette[Math.floor(Math.random() * palette.length)];
+      this.rect  = Math.random() > .4;
+    }
+    tick() {
+      this.vx *= this.dr;
+      this.vy  = this.vy * this.dr + this.g;
+      this.x  += this.vx;
+      this.y  += this.vy;
+      this.rot += this.sp;
+      this.a   -= this.dec;
+    }
+    draw(c) {
+      c.save();
+      c.globalAlpha = Math.max(0, this.a);
+      c.fillStyle   = this.color;
+      c.translate(this.x, this.y);
+      c.rotate(this.rot);
+      if (this.rect) {
+        c.fillRect(-this.sz/2, -this.sz * this.asp / 2, this.sz, this.sz * this.asp);
+      } else {
+        c.beginPath();
+        c.ellipse(0, 0, this.sz/2, this.sz * this.asp / 2, 0, 0, Math.PI*2);
+        c.fill();
+      }
+      c.restore();
+    }
+  }
+
+  function launchConfetti(x, y, color) {
+    for (let i = 0; i < 140; i++) ptcls.push(new Particle(x, y, color));
+    if (!rafID) tickConfetti();
+  }
+
+  function tickConfetti() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ptcls = ptcls.filter(p => p.a > 0);
+    ptcls.forEach(p => { p.tick(); p.draw(ctx); });
+    if (ptcls.length) { rafID = requestAnimationFrame(tickConfetti); }
+    else { rafID = null; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  }
+
+  /* ════════════════════════════════════════════════════════════════
+     AI — CPU MOVE DISPATCHER
+  ════════════════════════════════════════════════════════════════ */
+  function cpuMove() {
+    if (over) return;
+    let idx;
+    if      (diff === 'easy')   idx = randomMove();
+    else if (diff === 'medium') idx = mediumMove();
+    else                        idx = minimaxMove();
+    if (idx !== -1) placeMove(idx);
+  }
+
+  /* Random — picks any open cell */
+  function randomMove() {
+    const open = cells.map((v,i) => v ? -1 : i).filter(i => i !== -1);
     return open.length ? open[Math.floor(Math.random() * open.length)] : -1;
   }
 
+  /* Medium — greedy 65% of the time, random 35% */
   function mediumMove() {
-    // 60% smart, 40% random
-    if (Math.random() < 0.6) return smartMove();
-    return easyMove();
+    return Math.random() < .65 ? greedyMove() : randomMove();
   }
 
-  function minimaxMove() { return smartMove(true); }
+  /**
+   * Greedy heuristic: win > block > centre > corner > random.
+   * Used by medium difficulty and as a fast path in hard's minimax init.
+   */
+  function greedyMove() {
+    /* Win if possible */
+    for (let i = 0; i < 9; i++) {
+      if (!cells[i]) {
+        cells[i] = 'O';
+        const w = getWinner(cells);
+        cells[i] = null;
+        if (w === 'O') return i;
+      }
+    }
+    /* Block player from winning */
+    for (let i = 0; i < 9; i++) {
+      if (!cells[i]) {
+        cells[i] = 'X';
+        const w = getWinner(cells);
+        cells[i] = null;
+        if (w === 'X') return i;
+      }
+    }
+    if (!cells[4]) return 4;              // prefer centre
+    const corners = [0,2,6,8].filter(i => !cells[i]);
+    if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+    return randomMove();
+  }
 
-  function smartMove(full = false) {
-    // Win
-    for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'O';
-        if (checkWin()) { board[i] = null; return i; }
-        board[i] = null;
-      }
-    }
-    // Block
-    for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'X';
-        if (checkWin()) { board[i] = null; return i; }
-        board[i] = null;
-      }
-    }
-    if (!full) {
-      if (!board[4]) return 4;
-      const corners = [0,2,6,8].filter(i => !board[i]);
-      if (corners.length) return corners[Math.floor(Math.random()*corners.length)];
-      return easyMove();
-    }
-    // Full minimax
+  /* Hard — full alpha-beta Minimax, unbeatable */
+  function minimaxMove() {
     let best = -Infinity, bestIdx = -1;
     for (let i = 0; i < 9; i++) {
-      if (!board[i]) {
-        board[i] = 'O';
-        const score = minimax(board, 0, false);
-        board[i] = null;
+      if (!cells[i]) {
+        cells[i] = 'O';
+        const score = minimax(cells, 0, false, -Infinity, Infinity);
+        cells[i] = null;
         if (score > best) { best = score; bestIdx = i; }
       }
     }
     return bestIdx;
   }
 
-  function minimax(b, depth, isMax) {
-    const w = checkWin();
-    if (w) return isMax ? -10 + depth : 10 - depth;
+  /**
+   * Alpha-Beta Pruned Minimax.
+   *   Maximiser = 'O' (CPU),   score: +10 − depth  (faster wins preferred)
+   *   Minimiser = 'X' (Player),score: −10 + depth  (faster losses avoided)
+   */
+  function minimax(b, depth, isMax, alpha, beta) {
+    const winner = getWinner(b);
+    if (winner === 'O') return  10 - depth;
+    if (winner === 'X') return -10 + depth;
     if (b.every(Boolean)) return 0;
+
     if (isMax) {
       let best = -Infinity;
       for (let i = 0; i < 9; i++) {
-        if (!b[i]) { b[i]='O'; best=Math.max(best,minimax(b,depth+1,false)); b[i]=null; }
+        if (!b[i]) {
+          b[i] = 'O';
+          best  = Math.max(best, minimax(b, depth+1, false, alpha, beta));
+          b[i]  = null;
+          alpha = Math.max(alpha, best);
+          if (beta <= alpha) break;        // β-cut
+        }
       }
       return best;
     } else {
       let best = Infinity;
       for (let i = 0; i < 9; i++) {
-        if (!b[i]) { b[i]='X'; best=Math.min(best,minimax(b,depth+1,true)); b[i]=null; }
+        if (!b[i]) {
+          b[i] = 'X';
+          best  = Math.min(best, minimax(b, depth+1, true, alpha, beta));
+          b[i]  = null;
+          beta  = Math.min(beta, best);
+          if (beta <= alpha) break;        // α-cut
+        }
       }
       return best;
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────
-  function checkWin() {
-    return WIN_LINES.find(([a,b,c]) =>
-      board[a] && board[a] === board[b] && board[a] === board[c]
-    ) || null;
-  }
-
-  function highlightWin(line) {
-    const cells = document.querySelectorAll('.cell');
-    line.forEach(i => {
-      cells[i].classList.add('win-cell', currentPlayer === 'X' ? 'x-win' : 'o-win');
-    });
-  }
-
-  function setStatus(msg, cls) {
-    const el = document.getElementById('status');
-    el.textContent = msg;
-    el.className = 'status ' + cls;
-  }
-
-  function updateScores() {
-    document.getElementById('score-x').textContent = scores.X;
-    document.getElementById('score-o').textContent = scores.O;
-  }
-
+  /* ════════════════════════════════════════════════════════════════
+     RESET HELPERS
+  ════════════════════════════════════════════════════════════════ */
   function resetGame() {
-    board = Array(9).fill(null);
-    currentPlayer = 'X';
-    gameOver = false;
-    buildBoard();
-    setStatus("X's turn", 'x-turn');
+    cells = Array(9).fill(null);
+    turn  = 'X';
+    over  = false;
+
+    /* Clear win-line SVG */
+    const svg = document.getElementById('win-svg');
+    svg.innerHTML = '';
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+
+    /* Kill confetti */
+    ptcls = [];
+    if (rafID) { cancelAnimationFrame(rafID); rafID = null; }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    renderBoard();
+    setStatus();
+    closeModal();
+    refreshDiffTag();
   }
 
-  function resetScores() {
-    scores = { X: 0, O: 0 };
-    updateScores();
+  function resetAll() {
+    scores = { X: 0, D: 0, O: 0 };
+    ['x','d','o'].forEach(k =>
+      document.getElementById('sc-' + k).textContent = '0'
+    );
     resetGame();
   }
 
-  buildBoard();
-</script>
+  /* ════════════════════════════════════════════════════════════════
+     BOOT
+  ════════════════════════════════════════════════════════════════ */
+  renderBoard();
+  refreshDiffTag();
+  </script>
 </body>
 </html>
